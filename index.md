@@ -1,5 +1,5 @@
 # malloc lab实验记录
- 
+
 本次实验的要求是实现一个动态分配器，实现mm_init、mm_malloc、mm_free和mm_realloc函数的相应功能，其中本书的9.9.12小节中实现一个简单的分配器更是为我们提供了一个模型  
 动态分配器实现所需的方法
 ```
@@ -160,11 +160,13 @@ void *mm_malloc(size_t size)
     return bp;
 }
 ```
-mm_malloc函数进行分配块的操作，在对请求的真假进行处理后，会先调用find_fit函数来匹配合适的块，如果没有合适的块就调用
+mm_malloc函数进行分配块的操作，在对请求的真假进行处理后，会先调用find_fit函数来匹配合适的块，如果没有合适的块就调用extend_heap函数分配新的空闲块  
+
 
 分离适配空闲链表的测试结果
 
 ![image](https://user-images.githubusercontent.com/37897095/118970815-3d0bf880-b9a1-11eb-82d1-06062cb7cb7c.png)
 
+参考博客：https://blog.csdn.net/u012336567/article/details/52004250
 
 
