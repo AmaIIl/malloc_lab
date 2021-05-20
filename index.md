@@ -1,5 +1,5 @@
 # malloc lab实验记录
-在学习了csapp的第九章以后对于c中的堆管理器有了新的认识和了解  
+ 
 本次实验的要求是实现一个动态分配器，实现mm_init、mm_malloc、mm_free和mm_realloc函数的相应功能，其中本书的9.9.12小节中实现一个简单的分配器更是为我们提供了一个模型  
 动态分配器实现所需的方法
 ```
@@ -84,7 +84,7 @@ void *mm_realloc(void *ptr, size_t size)
 然后那个...traces的截图也无了，记得是在80分左右，因为realloc函数用的还是最原始的那个版本的没有进行条件判断，所以分数是低了点  
 ## 分离适配空闲链表
 但是问题不大，我们需要实现的是分离空闲链表，基本的思路是在heap的头部放置大小类并用序言块进行隔离，对于我们每次malloc请求的size与大小类进行匹配找到对应的范围，再在其中进行首次匹配（因为其匹配是在类所指定的范围内进行，所以基本等同于最佳匹配），并找到合适的块然后进行分割，将剩余的插入合适的空闲链表中，若遍历了所有大小类依然没有找到就向内存申请更大的空间。
-## mm_init
+### mm_init
 ```
 int mm_init(void)
 {
@@ -112,8 +112,8 @@ int mm_init(void)
     return 0;
 }
 ```
-在原函数的基础上，加上了大小类，使其位于heap的头部，并用序言块与数据进行分隔，并且每个大小类中的size由大到小进行排序，而其中extend_heap函数在初始化函数和当没有匹配到合适块时候被调用  
-而分离适配是在显式空闲链表的基础上进行的修改，所以其中的构造方法与显示空闲链表的构造保持一致
+mm_init初始化堆 ，在原函数的基础上，加上了大小类，使其位于heap的头部，并用序言块与数据进行分隔，并且每个大小类中的size由大到小进行排序，而其中extend_heap函数在初始化函数和当没有匹配到合适块时候被调用  
+### extend_heap
 ```
 static void *extend_heap(size_t words)
 {
@@ -132,7 +132,35 @@ static void *extend_heap(size_t words)
 	return coalesce(bp);
 }
 ```
+extend_heap函数扩展堆块，其在保证了字节对齐的前提下，创建空闲块，并且在创建块的后面补全结束块（0，1），关于函数的构造因为分离适配是在显式空闲链表的基础上增加了大小类来减少分配的时间，所以其中的构造方法与显示空闲链表的构造保持一致
+### mm_malloc
+```
+void *mm_malloc(size_t size)
+{
+    size_t asize;
+    size_t extendsize;
+    char *bp;
 
+    if (size == 0)
+    	return NULL;
+    if (size <= DSIZE)
+    	asize = 2*DSIZE;
+    else
+    	asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
+
+    if ((bp = find_fit(asize)) != NULL){
+    	place(bp, asize);
+    	return bp;
+    }
+
+    extendsize = MAX(asize, CHUNKSIE);
+    if ((bp = extend_heap(extendsize/WSIZE)) == NULL)
+    	return NULL;
+    place(bp, asize);
+    return bp;
+}
+```
+mm_malloc函数进行分配块的操作，在对请求的真假进行处理后，会先调用find_fit函数来匹配合适的块，如果没有合适的块就调用
 
 分离适配空闲链表的测试结果
 
