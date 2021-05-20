@@ -68,8 +68,13 @@ void *mm_realloc(void *ptr, size_t size)
     return newptr;
 }
 ```
+隐式空闲链表的测试结果
 
 ![image](https://user-images.githubusercontent.com/37897095/118917459-850c2a80-b963-11eb-9183-8d7bfca16b6c.png)
+
+显示空闲链表的测试结果
+![image](https://user-images.githubusercontent.com/37897095/118930092-e4743580-b977-11eb-95b3-065d52f4e3ef.png)
+
 
 而我们需要实现的是分离空闲链表，我目前对它的认知和了解是其通过将大小类放在heap的头部并用序言块进行隔离，对于我们每次malloc请求的size与大小类进行匹配找到对应的范围，再在其中进行首次匹配（因为其匹配是在类所指定的范围内进行，所以基本等同于最佳匹配），并找到合适的块
 
