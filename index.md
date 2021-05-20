@@ -27,6 +27,7 @@
 ```
 其中隐式空闲链表的代码书上已经给出，只需要修改一下realloc函数即可完成
 ![image](https://user-images.githubusercontent.com/37897095/118917459-850c2a80-b963-11eb-9183-8d7bfca16b6c.png)
+
 而显式空闲链表的块构造相比于隐式的多了前驱与后继，要处理prev与next指针需要增加新的宏定义
 ```
 #define PREV_LINKNODE_RP(bp) ((char *)(bp))
