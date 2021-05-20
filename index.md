@@ -25,7 +25,37 @@
 #define NEXT_BLKP(bp)	((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
 #define PREV_BLKP(bp)	((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 ```
-其中隐式空闲链表的代码书上已经给出，只需要修改一下realloc函数即可完成
+其中隐式空闲链表的代码书上已经给出，但是第一次测试分数时报错realloc函数没有将旧的data赋给新生成的块
+
+```
+void *mm_realloc(void *ptr, size_t size)
+{
+    size_t oldsize;
+    void *newptr;
+
+    if(size == 0) {
+        mm_free(ptr);
+        return 0;
+    }
+    if(ptr == NULL) {
+        return mm_malloc(size);
+    }
+
+    if(!(newptr = mm_malloc(size))) {
+        return 0;
+    }
+
+    oldsize = GET_SIZE(HDRP(ptr));
+
+    if(size < oldsize) 
+    	oldsize = size;
+    
+    memcpy(newptr, ptr, oldsize);
+    mm_free(ptr);
+
+    return newptr;
+}
+```
 ![image](https://user-images.githubusercontent.com/37897095/118917459-850c2a80-b963-11eb-9183-8d7bfca16b6c.png)
 
 而显式空闲链表的块构造相比于隐式的多了前驱与后继，要处理prev与next指针需要增加新的宏定义
@@ -33,4 +63,5 @@
 #define PREV_LINKNODE_RP(bp) ((char *)(bp))
 #define NEXT_LINKNODE_RP(bp) ((char *)(bp) + WSIZE)
 ```
+
 
