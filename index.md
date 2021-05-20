@@ -37,7 +37,8 @@
 #define NEXT_BLKP(bp)	((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
 #define PREV_BLKP(bp)	((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 ```
-其中隐式空闲链表的代码书上已经给出，但是第一次测试分数时报错realloc函数没有将旧的data赋给新生成的块  
+## 隐式空闲链表
+隐式空闲链表的代码书上已经给出，但是第一次测试分数时报错realloc函数没有将旧的data赋给新生成的块  
 这里用的方法是不考虑前后是否有空闲块以及是否需要进行合并，只是对新要求的size和旧的size进行比对
 ```
 void *mm_realloc(void *ptr, size_t size)
@@ -72,6 +73,7 @@ void *mm_realloc(void *ptr, size_t size)
 
 ![image](https://user-images.githubusercontent.com/37897095/118917459-850c2a80-b963-11eb-9183-8d7bfca16b6c.png)
 
+## 显示空闲链表
 显示空闲链表的构造码了半天，结果一直用的节点不知道为啥突然不好使了，等能连上发现写的全无了...代码也已经改成分离适配的了（草）  
 就在隐式的基础上，块的构造时多加两个指针指向前驱和后继，然后在进行合并、创建等操作时相应的对空闲链表进行对应的断开和连接  
 其中新加的宏定义方便我们对prev和next指针进行操作
@@ -80,6 +82,7 @@ void *mm_realloc(void *ptr, size_t size)
 #define NEXT_LINKNODE_RP(bp) ((char *)(bp) + WSIZE)
 ```
 然后那个...traces的截图也无了，记得是在80分左右，因为realloc函数用的还是最原始的那个版本的没有进行条件判断，所以分数是低了点  
+## 分离适配空闲链表
 但是问题不大，我们需要实现的是分离空闲链表，基本的思路是在heap的头部放置大小类并用序言块进行隔离，对于我们每次malloc请求的size与大小类进行匹配找到对应的范围，再在其中进行首次匹配（因为其匹配是在类所指定的范围内进行，所以基本等同于最佳匹配），并找到合适的块然后进行分割，将剩余的插入合适的空闲链表中，若遍历了所有大小类依然没有找到就向内存申请更大的空间。
 ## mm_init
 ```
