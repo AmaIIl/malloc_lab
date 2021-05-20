@@ -72,8 +72,68 @@ void *mm_realloc(void *ptr, size_t size)
 
 ![image](https://user-images.githubusercontent.com/37897095/118917459-850c2a80-b963-11eb-9183-8d7bfca16b6c.png)
 
-而我们需要实现的是分离空闲链表，基本的思路是在heap的头部放置大小类并用序言块进行隔离，对于我们每次malloc请求的size与大小类进行匹配找到对应的范围，再在其中进行首次匹配（因为其匹配是在类所指定的范围内进行，所以基本等同于最佳匹配），并找到合适的块然后进行分割，将剩余的插入合适的空闲链表中，若遍历了所有大小类依然没有找到就向内存申请更大的空间。
+显示空闲链表的构造码了半天，结果一直用的节点不知道为啥突然不好使了，等能连上发现写的全无了...代码也已经改成分离适配的了（草）  
+就在隐式的基础上，块的构造时多加两个指针指向前驱和后继，然后在进行合并、创建等操作时相应的对空闲链表进行对应的断开和连接  
+其中新加的宏定义方便我们对prev和next指针进行操作
+```
+#define PREV_LINKNODE_RP(bp) ((char *)(bp))
+#define NEXT_LINKNODE_RP(bp) ((char *)(bp) + WSIZE)
+```
+然后那个...traces的截图也无了，记得是在80分左右，因为realloc函数用的还是最原始的那个版本的没有进行条件判断，所以分数是低了点  
+但是问题不大，我们需要实现的是分离空闲链表，基本的思路是在heap的头部放置大小类并用序言块进行隔离，对于我们每次malloc请求的size与大小类进行匹配找到对应的范围，再在其中进行首次匹配（因为其匹配是在类所指定的范围内进行，所以基本等同于最佳匹配），并找到合适的块然后进行分割，将剩余的插入合适的空闲链表中，若遍历了所有大小类依然没有找到就向内存申请更大的空间。
+## mm_init
+```
+int mm_init(void)
+{
+	if ((heap_listp = mem_sbrk(14*WSIZE)) == (void *)-1)
+		return -1;
+	PUT(heap_listp, 0);             
+	PUT(heap_listp + (1*WSIZE), 0); 
+	PUT(heap_listp + (2*WSIZE), 0); 
+	PUT(heap_listp + (3*WSIZE), 0); 
+	PUT(heap_listp + (4*WSIZE), 0); 
+	PUT(heap_listp + (5*WSIZE), 0);
+	PUT(heap_listp + (6*WSIZE), 0);
+	PUT(heap_listp + (7*WSIZE), 0);
+	PUT(heap_listp + (8*WSIZE), 0);
+	PUT(heap_listp + (9*WSIZE), 0);
+	PUT(heap_listp + (10*WSIZE), 0);
+	PUT(heap_listp + (11*WSIZE), PACK(DSIZE, 1));
+	PUT(heap_listp + (12*WSIZE), PACK(DSIZE, 1));
+	PUT(heap_listp + (13*WSIZE), PACK(0, 1));
+	block_list_start = heap_listp;
+	heap_listp += (12*WSIZE);
 
+	if (extend_heap(CHUNKSIE/WSIZE) == NULL)
+		return -1;
+    return 0;
+}
+```
+在原函数的基础上，加上了大小类，使其位于heap的头部，并用序言块与数据进行分隔，并且每个大小类中的size由大到小进行排序，而其中extend_heap函数在初始化函数和当没有匹配到合适块时候被调用  
+而分离适配是在显式空闲链表的基础上进行的修改，所以其中的构造方法与显示空闲链表的构造保持一致
+```
+static void *extend_heap(size_t words)
+{
+	char *bp;
+	size_t size;
+
+	size = (words % 2) ? (words+1) * WSIZE : words * WSIZE;
+	if ((long)(bp = mem_sbrk(size)) == -1)
+		return NULL;
+	PUT(HDRP(bp), PACK(size, 0));
+	PUT(FTRP(bp), PACK(size, 0));
+	PUT(NEXT_LINKNODE_RP(bp), NULL);
+	PUT(PREV_LINKNODE_RP(bp), NULL);
+	PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));
+
+	return coalesce(bp);
+}
+```
+
+
+分离适配空闲链表的测试结果
+
+![image](https://user-images.githubusercontent.com/37897095/118970815-3d0bf880-b9a1-11eb-82d1-06062cb7cb7c.png)
 
 
 
