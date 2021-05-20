@@ -161,12 +161,31 @@ void *mm_malloc(size_t size)
 }
 ```
 mm_malloc函数进行分配块的操作，在对请求的真假进行处理后，会先调用find_fit函数来匹配合适的块，如果没有合适的块就调用extend_heap函数分配新的空闲块  
+### find_fit
+```
+static void *find_fit(size_t asize)
+{
+	char *root = find_list_root(asize);
+	char *tmpP = GET(root);
+
+	for (root; root!=(heap_listp-(2*WSIZE)); root+=WSIZE)
+	{
+		char *tmpP = GET(root);
+		while (tmpP != NULL)
+		{
+			if (GET_SIZE(HDRP(tmpP)) >= asize)
+				return tmpP;
+			tmpP = GET(NEXT_LINKNODE_RP(tmpP));
+		}
+	}
+	return NULL;
+}
+```
 
 
 分离适配空闲链表的测试结果
 
 ![image](https://user-images.githubusercontent.com/37897095/118970815-3d0bf880-b9a1-11eb-82d1-06062cb7cb7c.png)
 
-参考博客：https://blog.csdn.net/u012336567/article/details/52004250
 
 
