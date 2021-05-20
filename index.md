@@ -1,6 +1,18 @@
 # malloc lab实验记录
 在学习了csapp的第九章以后对于c中的堆管理器有了新的认识和了解  
 本次实验的要求是实现一个动态分配器，实现mm_init、mm_malloc、mm_free和mm_realloc函数的相应功能，其中本书的9.9.12小节中实现一个简单的分配器更是为我们提供了一个模型  
+动态分配器实现所需的方法
+```
+隐式空闲链表
+显式空闲链表
+分离空闲链表
+```
+匹配合适空闲块的方法
+```
+首次适配
+下一次适配
+最佳适配
+```
 书中在编写简单的分配器时使用了许多宏来帮助我们访问和遍历空闲链表  
 ```
 #define WSIZE		4
@@ -25,8 +37,8 @@
 #define NEXT_BLKP(bp)	((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
 #define PREV_BLKP(bp)	((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 ```
-其中隐式空闲链表的代码书上已经给出，但是第一次测试分数时报错realloc函数没有将旧的data赋给新生成的块
-
+其中隐式空闲链表的代码书上已经给出，但是第一次测试分数时报错realloc函数没有将旧的data赋给新生成的块  
+这里用的方法是不考虑前后是否有空闲块以及是否需要进行合并，只是对新要求的size和旧的size进行比对
 ```
 void *mm_realloc(void *ptr, size_t size)
 {
@@ -56,12 +68,9 @@ void *mm_realloc(void *ptr, size_t size)
     return newptr;
 }
 ```
+
 ![image](https://user-images.githubusercontent.com/37897095/118917459-850c2a80-b963-11eb-9183-8d7bfca16b6c.png)
 
-而显式空闲链表的块构造相比于隐式的多了前驱与后继，要处理prev与next指针需要增加新的宏定义
-```
-#define PREV_LINKNODE_RP(bp) ((char *)(bp))
-#define NEXT_LINKNODE_RP(bp) ((char *)(bp) + WSIZE)
-```
+而我们需要实现的是分离空闲链表，我目前对它的认知和了解是其通过将大小类放在heap的头部并用序言块进行隔离，对于我们每次malloc请求的size与大小类进行匹配找到对应的范围，再在其中进行首次匹配（因为其匹配是在类所指定的范围内进行，所以基本等同于最佳匹配），并找到合适的块
 
 
