@@ -275,7 +275,72 @@ void *mm_malloc(size_t size)
 ```
 
 ## first_fit
+首先需要判断所申请的大小所属的大小类（Index），然后保持一个原则：对这个大小类中的空闲链表进行遍历，如果有合适的空闲块则直接返回其对应指针（root），若在这个大小类中没有找到，就去下一个大小类中寻找，因为下一个大小类对应的范围一定是大于当前的大小类的，如果所有的大小类中的空闲链表都遍历了还是没有找到就返回NULL，让mm_malloc函数通过extend_heap函数分配新的空闲块进行使用。
+```
+static void *first_fit(size_t asize){
+	int index = Index(asize);
+	void *root;
 
+	while (index <= 8)
+	{
+		root = listp + (index*WSIZE);
+		while ((root = SUCC_BLKP(root)) != NULL)
+		{
+			if (GET_SIZE(HDRP(root)) >= asize && GET_ALLOC(HDRP(root)) == 0)
+			{
+				return root;
+			}
+		}
+		index++;
+	}
+	return NULL;
+}
+```
+
+## place
+place函数在使用空闲块的同时(将头部脚部的使用状态从0改为1)，需要判断申请的空间大小与使用的空闲块的大小是否有剩余，如果剩余满足生成一个最小空闲块的要求，就进行分割  
+而因为有了显示空闲链表的概念，我们在使用一个空闲块的时候，需要将其从对应的空闲链表中删除，并在分割出新的空闲块时将其插入到对应的空闲链表中
+```
+static void place(void *bp, size_t asize)
+{
+	size_t csize = GET_SIZE(HDRP(bp));
+	delete_block(bp);
+	if ((csize - asize) >= (2*DSIZE))
+	{
+		PUT(HDRP(bp), PACK(asize, 1));
+		PUT(FTRP(bp), PACK(asize, 1));
+		bp = NEXT_BLKP(bp);
+		PUT(HDRP(bp), PACK(csize - asize, 0));
+		PUT(FTRP(bp), PACK(csize - asize, 0));
+		add_block(bp);
+	}
+	else
+	{
+		PUT(HDRP(bp), PACK(csize, 1));
+		PUT(FTRP(bp), PACK(csize, 1));
+	}
+}
+```
+
+## mm_free
+mm_free函数在释放产生新的空闲块的同时，需要对新产生的空闲块进行判断，判断其是否需要合并，在合并完成后将其添加到对应的空闲链表中
+```
+void mm_free(void *ptr)
+{
+	size_t size = GET_SIZE(HDRP(ptr));
+
+	PUT(HDRP(ptr), PACK(size, 0));
+	PUT(FTRP(ptr), PACK(size, 0));
+	ptr = coalesce(ptr);
+	add_block(ptr);
+}
+
+```
+
+最后的得分
+![image](https://user-images.githubusercontent.com/37897095/119224571-94d96980-bb31-11eb-914a-6ab2620628d9.png)
+## 小结
+csapp的malloc_lab就告一段落了，这个实验给我最大的感觉就是有着许多的提升空间，好比说脚部可以只在空闲块中使用，以及realloc可以为其再增加一些功能提升效率等等，不得不说一套实验做下来收获还是蛮大的，好了菜鸡要去啃malloc源码了，886。
 
 
 
