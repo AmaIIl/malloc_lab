@@ -78,6 +78,98 @@ void *mm_realloc(void *ptr, size_t size)
 
 ![image](https://user-images.githubusercontent.com/37897095/119223292-15e13280-bb2b-11eb-8b8b-b222a2cd73ac.png)
 
+![image](https://user-images.githubusercontent.com/37897095/119223325-5b9dfb00-bb2b-11eb-81ca-64207276dc6c.png)
+
+## mm_init函数
+在隐式的基础上，增加了前驱与后继指针来组成双向链表，并且因为增加了两个指针（8字节）的缘故，一个块的最小就是16字节（头部+脚部+前驱+后继）。所以一开始先是在堆的头部存放空闲适配表，其中每一个数（0-8）都对应了一个申请范围的空闲链表，后续我们需要增加新的空闲块或进行适配时都会用到它。程序的最后依然是使用extend_heap函数申请堆空间，但是因为增加了前驱后继的缘故，函数也发生了些许变化。
+```
+int mm_init(void)
+{
+    if ((heap_listp = mem_sbrk(12*WSIZE)) == (void *)-1) return -1;
+    PUT(heap_listp + (0*WSIZE) , NULL);
+    PUT(heap_listp + (1*WSIZE) , NULL);
+    PUT(heap_listp + (2*WSIZE) , NULL);
+    PUT(heap_listp + (3*WSIZE) , NULL);
+    PUT(heap_listp + (4*WSIZE) , NULL);
+    PUT(heap_listp + (5*WSIZE) , NULL);
+    PUT(heap_listp + (6*WSIZE) , NULL);
+    PUT(heap_listp + (7*WSIZE) , NULL);
+    PUT(heap_listp + (8*WSIZE) , NULL);
+    PUT(heap_listp + (9*WSIZE), PACK(DSIZE, 1));
+    PUT(heap_listp + (10*WSIZE), PACK(DSIZE, 1));
+    PUT(heap_listp + (11*WSIZE), PACK(0, 1));
+    listp = heap_listp;
+    heap_listp += (10*WSIZE);
+
+    if (extend_heap(CHUNKSIZE/WSIZE) == NULL) return -1;
+    return 0;
+}
+
+```
+
+## extend_heap
+在隐式空闲链表的功能的基础上，需要对空闲块所再的空闲链表进行增加和删除的操作，其中coalesce函数依旧是分情况去合并空闲块，只是在合并之前需要将旧的空闲块在其对应的空闲链表中删除掉，再将新合并的空闲块加入到对应的空闲链表中
+```
+static void *extend_heap(size_t words)
+{
+	char *bp;
+	size_t size;
+
+	size = (words % 2) ? (words+1) * WSIZE : words * WSIZE;
+	if ((long)(bp = mem_sbrk(size)) == -1) return NULL;
+
+	PUT(HDRP(bp), PACK(size, 0));
+	PUT(FTRP(bp), PACK(size, 0));
+	PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));
+
+	PUT(PRED(bp), NULL);
+	PUT(SUCC(bp), NULL);
+	bp = coalesce(bp);
+	bp = add_block(bp);
+	return bp;
+}
+```
+
+## coalesce
+```
+static void *coalesce(void *bp)
+{
+	size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
+	size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
+	size_t size = GET_SIZE(HDRP(bp));
+
+	if (prev_alloc && next_alloc)
+	{
+		return bp;
+	}
+	else if (prev_alloc && !next_alloc)
+	{
+		size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
+		delete_block(NEXT_BLKP(bp));
+		PUT(HDRP(bp), PACK(size, 0));
+		PUT(FTRP(bp), PACK(size, 0));
+	}
+	else if (!prev_alloc && next_alloc)
+	{
+		size += GET_SIZE(HDRP(PREV_BLKP(bp)));
+		delete_block(PREV_BLKP(bp));
+		PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
+		PUT(FTRP(bp), PACK(size, 0));
+		bp = PREV_BLKP(bp);
+	}
+	else
+	{
+		size += GET_SIZE(HDRP(NEXT_BLKP(bp))) + 
+				GET_SIZE(HDRP(PREV_BLKP(bp)));
+		delete_block(PREV_BLKP(bp));
+		delete_block(NEXT_BLKP(bp));
+		PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
+		PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
+		bp = PREV_BLKP(bp);
+	}
+	return bp;
+}
+```
 
 
 
