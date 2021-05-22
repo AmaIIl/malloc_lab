@@ -80,9 +80,22 @@ void *mm_realloc(void *ptr, size_t size)
 
 ![image](https://user-images.githubusercontent.com/37897095/119223325-5b9dfb00-bb2b-11eb-81ca-64207276dc6c.png)
 
-## mm_init函数
-在隐式的基础上，增加了前驱与后继指针来组成双向链表，并且因为增加了两个指针（8字节）的缘故，一个块的最小就是16字节（头部+脚部+前驱+后继）。所以一开始先是在堆的头部存放空闲适配表，其中每一个数（0-8）都对应了一个申请范围的空闲链表，后续我们需要增加新的空闲块或进行适配时都会用到它。程序的最后依然是使用extend_heap函数申请堆空间，但是因为增加了前驱后继的缘故，函数也发生了些许变化。
+并且为了方便我们操作新增加的前驱后继，添加了新的宏以便我们操作
 ```
+/*取出块的前驱指针和后继指针的地址*/
+#define PRED(bp) ((char*)(bp) + WSIZE)
+#define SUCC(bp) ((char*)bp)
+/*取出块的前驱和后继所指向的块*/
+#define PRED_BLKP(bp) (GET(PRED(bp)))
+#define SUCC_BLKP(bp) (GET(SUCC(bp)))
+```
+
+## mm_init函数
+在隐式的基础上，增加了前驱与后继指针来组成双向链表，并且因为增加了两个指针（8字节）的缘故，一个块的最小就是16字节（头部+脚部+前驱+后继）。所以一开始先是在堆的头部存放空闲适配表，其中每一个大小类（0-8）都对应了一个申请范围的空闲链表。并且为了方便我们后续对其进行操作，让listp指针指向大小类的头部，这样当我们想对大小类中的空闲列表进行操作时只需要用 listp + (X * WSZIE) 即可。  
+程序的最后依然是使用extend_heap函数申请堆空间，但是因为增加了前驱后继的缘故，函数也发生了些许变化。
+```
+static char *listp;
+
 int mm_init(void)
 {
     if ((heap_listp = mem_sbrk(12*WSIZE)) == (void *)-1) return -1;
@@ -170,6 +183,99 @@ static void *coalesce(void *bp)
 	return bp;
 }
 ```
+
+## delete_block
+对于旧的空闲块，当我们执行合并操作时需要将其从空闲链表中删除，这里模仿coalesce函数分情况删除
+```
+static void delete_block(void *bp)
+{
+	if (PRED_BLKP(bp) != NULL && SUCC_BLKP(bp) != NULL)
+	{
+		PUT(PRED(SUCC_BLKP(bp)), PRED_BLKP(bp));
+		PUT(SUCC(PRED_BLKP(bp)), SUCC_BLKP(bp));
+	}
+	else if (PRED_BLKP(bp) != NULL && SUCC_BLKP(bp) == NULL)
+	{
+		PUT(SUCC(PRED_BLKP(bp)), NULL);
+	}
+	else if (PRED_BLKP(bp) == NULL && SUCC_BLKP(bp) != NULL)
+	{
+		PUT(PRED(SUCC_BLKP(bp)), NULL);
+	}
+}
+```
+
+## add_block && Index
+首先使用Index函数来判断所属的大小类，再将其按照LIFO(后进先出)的规则放在链表的前面，这里需要注意的是当root的后继指向NULL时，我们只需要将空闲块的后继指向空，再将root与空闲块关联起来即可
+```
+static int Index(size_t size)
+{
+	if (size < 16) return -1;
+	if (size <= 31) return 0;
+	if (size <= 63) return 1;
+	if (size <= 127) return 2;
+	if (size <= 255) return 3;
+	if (size <= 511) return 4;
+	if (size <= 1023) return 5;
+	if (size <= 2047) return 6;
+	if (size <= 4095) return 7;
+	if (size >= 4096) return 8;
+}
+
+static void *add_block(void *bp)
+{
+	size_t index = Index(GET_SIZE(HDRP(bp)));
+	void *root;
+
+	if (index != -1)
+	{
+		root = listp + (index*WSIZE);
+		if (SUCC_BLKP(root) != NULL)
+		{
+			PUT(PRED(SUCC_BLKP(root)), bp);
+			PUT(SUCC(bp), SUCC_BLKP(root));
+		}
+		else
+		{
+			PUT(SUCC(bp), NULL);
+		}
+		PUT(PRED(bp), root);
+		PUT(SUCC(root), bp);
+	}
+	return bp;
+}
+```
+## mm_malloc
+mm_malloc函数与隐式空闲链表中所实现的功能一致，在保证字节对齐的前提下，通过首次适配（first_fit）的方法寻找合适的空闲链表，如果找到了就进行分配（place），如果没有找到就调用extend_heap函数来分配新的空闲块在进行分配，而其中的fist_fit函数与place函数与隐式空闲链表的构造相比增加了些许新的功能
+```
+void *mm_malloc(size_t size)
+{
+    char *bp;
+    size_t asize;
+    size_t extend_size;
+
+    if (size == 0) return NULL;
+
+    if (size <= DSIZE)
+    	asize = 2 * DSIZE;
+    else
+    	asize = DSIZE * ((size + (DSIZE) + (DSIZE - 1)) / DSIZE);
+
+    if ((bp = first_fit(asize)) != NULL)
+    {
+    	place(bp, asize);
+    	return bp;
+    }
+
+    extend_size = MAX(asize, CHUNKSIZE);
+    if ((bp = extend_heap(extend_size/WSIZE)) == NULL) return NULL;
+    place(bp, asize);
+    return bp;
+}
+```
+
+## first_fit
+
 
 
 
